@@ -1,4 +1,4 @@
-box: wercker/golang@1.2.1
+box: wercker/golang
 # Services
 services:
     - mies/rethinkdb
@@ -7,13 +7,12 @@ services:
 build:
   # The steps that will be executed on build
   steps:
-    # Sets the go workspace and places you package
-    # at the right place in the workspace tree
+    # Sets the go workspace and places you package at the right place in the workspace tree
     - setup-go-workspace
 
     # Gets the dependencies
     - script:
-        name: go get
+        name: goapp
         code: |
           cd $WERCKER_SOURCE_DIR
           go version
@@ -21,12 +20,12 @@ build:
 
     # Build the project
     - script:
-        name: go build
+        name: goapp
         code: |
           go build ./...
 
     # Test the project
     - script:
-        name: go test
+        name: goapp
         code: |
           go test ./...
