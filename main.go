@@ -1,56 +1,82 @@
 package main
 
 import (
+    "log"
+    "os"
     "net/http"
-    "net/http/httptest"
-    "strings"
-    "testing"
     "encoding/json"
-    "bytes"
+    r "github.com/christopherhesse/rethinkgo"
 )
 
-func init() {
-    initDb()
+var sessionArray []*r.Session
+
+type Bookmark struct {
+    Title string
+    Url   string
 }
 
-func TestHandleIndexReturnsWithStatusOK(t *testing.T) {
-    request, _ := http.NewRequest("GET", "/", nil)
-    response := httptest.NewRecorder()
-
-    handleIndex(response, request)
-
-    if response.Code != http.StatusOK {
-        t.Fatalf("Response body did not contain expected %v:\n\tbody: %v", "200", response.Code)
-    }
-}
-
-func TestHandInsertBookmarkWithStatusOK(t *testing.T) {
-    bookmark := Bookmark{"wercker", "http://wercker.com"}
-
-    b, err := json.Marshal(bookmark)
+func initDb() {
+    session, err := r.Connect(os.Getenv("WERCKER_RETHINKDB_URL"), "gettingstarted")
     if err != nil {
-        t.Fatalf("Unable to marshal Bookmark")
+        log.Fatal(err)
+        return
     }
 
-    request, _ := http.NewRequest("POST", "/new", bytes.NewReader(b))
-    response := httptest.NewRecorder()
+    err = r.DbCreate("gettingstarted").Run(session).Exec()
+    if err != nil {
+      log.Println(err)
+    }
 
-    insertBookmark(response, request)
+    err = r.TableCreate("bookmarks").Run(session).Exec()
+    if err != nil {
+      log.Println(err)
+    }
 
-    body := response.Body.String()  
-    if !strings.Contains(body, "{'bookmark':'saved'}") {
-        t.Fatalf("Response body did not contain expected %v:\n\tbody: %v", "San Francisco", body)
+    sessionArray = append(sessionArray, session)
+}
+
+func main() {
+
+    initDb()
+
+    http.HandleFunc("/", handleIndex)
+    http.HandleFunc("/new", insertBookmark)
+
+    err := http.ListenAndServe(":5000", nil)
+    if err != nil {
+        log.Fatal("Error: %v", err)
     }
 }
 
-func TestHandleIndexReturnsJSON(t *testing.T) {
-    request, _ := http.NewRequest("GET", "/", nil)
-    response := httptest.NewRecorder()
+func insertBookmark(res http.ResponseWriter, req *http.Request) {
+    session := sessionArray[0]
 
-    handleIndex(response, request)
+    b := new(Bookmark)
+    json.NewDecoder(req.Body).Decode(b)
 
-    ct := response.HeaderMap["Content-Type"][0]
-    if !strings.EqualFold(ct, "application/json") {
-        t.Fatalf("Content-Type does not equal 'application/json'")
+    var response r.WriteResponse
+
+    err := r.Table("bookmarks").Insert(b).Run(session).One(&response)
+    if err != nil {
+        log.Fatal(err)
+        return
     }
+    data, _ := json.Marshal("{'bookmark':'saved'}")
+    res.Header().Set("Content-Type", "application/json; charset=utf-8")
+    res.Write(data)
+}
+
+func handleIndex(res http.ResponseWriter, req *http.Request) {
+    session := sessionArray[0]
+    var response []Bookmark
+
+    err := r.Table("bookmarks").Run(session).All(&response)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    data, _ := json.Marshal(response)
+
+    res.Header().Set("Content-Type", "application/json")
+    res.Write(data)
 }
