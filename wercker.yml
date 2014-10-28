@@ -1,7 +1,8 @@
-box: wercker/golang
+box: wercker/golang@1.2.1
 # Services
 services:
     - mies/rethinkdb
+    
 # Build definition
 build:
   # The steps that will be executed on build
