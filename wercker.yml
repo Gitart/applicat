@@ -1,28 +1,31 @@
-box: wercker/ruby
+box: wercker/golang
+# Services
 services:
     - mies/rethinkdb
+# Build definition
 build:
-    steps:
-        # Execute the bundle install step, a step provided by wercker
-        - bundle-install
-        # Execute a custom script step.
-        - script:
-            name: testapplication
-            code: bundle exec applicat build --verbose
-deploy:
-    steps:
-        # Execute the heroku-deploy, heroku details can be edited
-        # online at http://app.wercker.com/
-        #- heroku-deploy
+  # The steps that will be executed on build
+  steps:
+    # Sets the go workspace and places you package
+    # at the right place in the workspace tree
+    - setup-go-workspace
 
-        # Execute the s3sync deploy step, a step provided by wercker
-        - s3sync:
-            key_id: $AWS_ACCESS_KEY_ID
-            key_secret: $AWS_SECRET_ACCESS_KEY
-            bucket_url: $AWS_BUCKET_URL
-            source_dir: build/
-    after-steps:
-        - hipchat-notify:
-            token: $HIPCHAT_TOKEN
-            room-id: 1000
-            from-name: Arthur
+    # Gets the dependencies
+    - script:
+        name: go get
+        code: |
+          cd $WERCKER_SOURCE_DIR
+          go version
+          go get ./...
+
+    # Build the project
+    - script:
+        name: go build
+        code: |
+          go build ./...
+
+    # Test the project
+    - script:
+        name: go test
+        code: |
+          go test ./...
